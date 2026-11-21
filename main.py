@@ -1,39 +1,3 @@
-"""
-EU ETS Speculative Trading Anomaly Monitor
-===========================================
-Streamlit dashboard that loads pre-trained Isolation Forest + Autoencoder
-models to score weekly EU ETS (carbon market) data for speculative /
-anomalous trading behaviour, validates against three known episodes
-(2006 crash, 2010-11 VAT-fraud, 2018 reform bubble), and links anomaly
-scores to market volatility.
-
-Expected model files (place in the same folder as this script, or point
-to them in the sidebar):
-    isolation_forest.joblib   -> sklearn.ensemble.IsolationForest
-    autoencoder_mlp.joblib    -> sklearn.neural_network.MLPRegressor
-                                 trained as an autoencoder (X -> X)
-    scaler.joblib             -> a fitted sklearn scaler (StandardScaler /
-                                 MinMaxScaler) applied to the 6 features
-                                 below before they reach the models
-
-Expected input CSV columns (weekly frequency, 2008-present):
-    date                              (YYYY-MM-DD)
-    eua_price                         (optional, for context plots)
-    eua_volume                        (optional, for context plots)
-    non_compliance_volume_ratio
-    price_fundamental_deviation
-    volume_spike_ratio
-    price_momentum
-    off_deadline_trading_intensity
-    options_futures_ratio
-
-If your training used a different column order, re-map it in the sidebar
-"Feature order" widget so it matches exactly what scaler.joblib expects.
-
-Run with:
-    streamlit run app.py
-"""
-
 import io
 import warnings
 from datetime import date
@@ -49,18 +13,12 @@ from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
 warnings.filterwarnings("ignore")
 
-# --------------------------------------------------------------------------
-# Page config & constants
-# --------------------------------------------------------------------------
 st.set_page_config(
     page_title="EU ETS Speculative Trading Monitor",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# --------------------------------------------------------------------------
-# Theme — warm terracotta / cream / deep green palette
-# --------------------------------------------------------------------------
 THEME = {
     "cream": "#FBF7EF",
     "cream_dark": "#EDE7DC",
@@ -210,9 +168,6 @@ KNOWN_EPISODES = [
 ]
 
 
-# --------------------------------------------------------------------------
-# Caching helpers
-# --------------------------------------------------------------------------
 @st.cache_resource(show_spinner=False)
 def load_model(file_or_path):
     """Load a joblib model from an uploaded file-like object or a path."""
@@ -344,9 +299,6 @@ def forecast_series(dates, values, horizon):
     return future_dates, point, lower, upper, method
 
 
-# --------------------------------------------------------------------------
-# Sidebar — configuration only (models & data load silently in the background)
-# --------------------------------------------------------------------------
 st.sidebar.markdown(
     f"""
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
@@ -361,11 +313,6 @@ st.sidebar.markdown(
 st.sidebar.caption("Speculative-activity anomaly monitoring")
 st.sidebar.markdown("---")
 
-# Model files & dataset are loaded automatically from the working directory —
-# no upload controls are shown in the UI. Place the following next to app.py:
-#   isolation_forest.joblib, autoencoder_mlp.joblib, scaler.joblib
-# and (optionally) a weekly CSV named one of: eu_ets_weekly.csv, data.csv,
-# eu_ets_data.csv — otherwise synthetic demo data is used automatically.
 LOCAL_DATA_CANDIDATES = ["eu_ets_weekly.csv", "eu_ets_data.csv", "data.csv", "weekly_data.csv"]
 
 
@@ -393,9 +340,6 @@ with st.sidebar.expander("Model status", expanded=not models_ready):
             "demo data without model scores until then."
         )
 
-# --------------------------------------------------------------------------
-# Load data — auto-detect a local CSV, otherwise fall back to demo data
-# --------------------------------------------------------------------------
 use_demo = True
 df = None
 for candidate in LOCAL_DATA_CANDIDATES:
@@ -435,9 +379,6 @@ with st.sidebar.expander("Advanced: feature order"):
         default=feature_cols,
     )
 
-# --------------------------------------------------------------------------
-# Header
-# --------------------------------------------------------------------------
 st.markdown(
     """
     <div class="hero-banner">
@@ -458,9 +399,6 @@ end_date = c2.date_input("End date", value=max_d, min_value=min_d, max_value=max
 mask = (df["date"].dt.date >= start_date) & (df["date"].dt.date <= end_date)
 view = df.loc[mask].reset_index(drop=True)
 
-# --------------------------------------------------------------------------
-# Scoring
-# --------------------------------------------------------------------------
 scored = view.copy()
 shap_values = None
 
@@ -494,14 +432,10 @@ else:
         "raw series only for now."
     )
 
-# --------------------------------------------------------------------------
-# Tabs
-# --------------------------------------------------------------------------
 tab_overview, tab_episodes, tab_explain, tab_volatility, tab_forecast, tab_data = st.tabs(
     ["Overview", "Episode Validation", "Explainability (SHAP)", "Volatility Link", "Forecast", "Data"]
 )
 
-# ---- Overview -------------------------------------------------------------
 with tab_overview:
     if "composite_score" in scored.columns:
         k1, k2, k3, k4 = st.columns(4)
@@ -583,7 +517,6 @@ with tab_overview:
                       title="EUA price / selected series")
         st.plotly_chart(fig, use_container_width=True)
 
-# ---- Episode validation -----------------------------------------------------
 with tab_episodes:
     st.subheader("Validation against documented speculative episodes")
     if "composite_score" in scored.columns:
@@ -628,7 +561,6 @@ with tab_episodes:
     else:
         st.info("Run scoring (load models + matching data) to see episode validation.")
 
-# ---- Explainability ---------------------------------------------------------
 with tab_explain:
     st.subheader("Feature-level explainability")
     if "composite_score" in scored.columns:
@@ -685,7 +617,6 @@ with tab_explain:
     else:
         st.info("Run scoring (load models + matching data) to see explainability charts.")
 
-# ---- Volatility link ---------------------------------------------------------
 with tab_volatility:
     st.subheader("Anomaly score vs market volatility")
     vol_col = None
@@ -732,7 +663,6 @@ with tab_volatility:
             "scoring, to see the volatility linkage."
         )
 
-# ---- Forecast ---------------------------------------------------------------
 with tab_forecast:
     st.subheader(f"{forecast_horizon}-week outlook")
     st.caption(
@@ -823,7 +753,6 @@ with tab_forecast:
         else:
             st.info("Run scoring (load models + matching data) to forecast the anomaly score.")
 
-# ---- Data tab ---------------------------------------------------------------
 with tab_data:
     st.subheader("Underlying data")
     st.dataframe(scored, use_container_width=True, height=420)
